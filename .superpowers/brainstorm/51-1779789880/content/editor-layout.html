@@ -1,0 +1,178 @@
+<h2>仪表盘编辑器 — 整体布局</h2>
+<p class="subtitle">展示模式：顶部全局变量栏 + 左侧组件面板 + 中央画布 + 右侧配置面板</p>
+
+<div class="mockup">
+  <div class="mockup-header">仪表盘编辑器</div>
+  <div class="mockup-body">
+    <!-- 顶部工具栏 -->
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 12px;background:#f0f0f0;border-bottom:1px solid #ddd;font-size:12px;">
+      <span style="font-weight:600;color:#333;">Vionix 仪表盘</span>
+      <span style="margin-left:auto;color:#888;">全局变量:</span>
+      <div style="background:#fff;border:1px solid #ccc;border-radius:4px;padding:2px 8px;font-size:11px;">设备: sensor-001 ▼</div>
+      <div style="background:#fff;border:1px solid #ccc;border-radius:4px;padding:2px 8px;font-size:11px;">时间: 最近2小时 ▼</div>
+      <div style="background:#4a90d9;color:#fff;border-radius:4px;padding:2px 10px;font-size:11px;margin-left:8px;">保存</div>
+      <div style="background:#fff;border:1px solid #ccc;border-radius:4px;padding:2px 10px;font-size:11px;">预览</div>
+    </div>
+
+    <div style="display:flex;height:340px;">
+      <!-- 左侧组件面板 -->
+      <div style="width:180px;background:#fafafa;border-right:1px solid #ddd;padding:8px;font-size:11px;overflow-y:auto;">
+        <div style="font-weight:600;color:#555;margin-bottom:6px;">组件库</div>
+
+        <div style="color:#888;font-size:10px;margin:4px 0 2px;">图表类</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">📈 折线图</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">📊 柱状图</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">🔵 仪表盘</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">📉 面积图</div>
+
+        <div style="color:#888;font-size:10px;margin:8px 0 2px;">指标/状态</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">🔢 数字指标</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">🟢 状态卡片</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">💡 设备状态灯</div>
+
+        <div style="color:#888;font-size:10px;margin:8px 0 2px;">告警类</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">🚨 告警列表</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">📊 告警统计</div>
+
+        <div style="color:#888;font-size:10px;margin:8px 0 2px;">表格类</div>
+        <div style="background:#fff;border:1px solid #e0e0e0;border-radius:4px;padding:6px 8px;margin:3px 0;cursor:grab;">📋 数据表格</div>
+      </div>
+
+      <!-- 中央画布（网格） -->
+      <div style="flex:1;background:#e8e8e8;padding:12px;position:relative;overflow:auto;">
+        <!-- 网格背景线 -->
+        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(0,0,0,0.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,0,0,0.05) 1px,transparent 1px);background-size:60px 60px;"></div>
+
+        <!-- 已放置的组件 -->
+        <div style="position:relative;z-index:1;display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(6,50px);gap:8px;">
+          <!-- 温度折线图 - 占 8列 3行 -->
+          <div style="grid-column:1/9;grid-row:1/4;background:#fff;border-radius:6px;border:2px solid #4a90d9;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size:11px;font-weight:600;color:#333;margin-bottom:4px;">温度实时曲线 <span style="float:right;color:#999;font-weight:400;font-size:10px;">⋮</span></div>
+            <div style="height:100px;background:linear-gradient(180deg,rgba(74,144,217,0.1),transparent);border-radius:4px;display:flex;align-items:flex-end;padding:4px;">
+              <svg width="100%" height="80" viewBox="0 0 400 80" preserveAspectRatio="none">
+                <polyline points="0,60 50,40 100,55 150,30 200,45 250,20 300,35 350,25 400,30" fill="none" stroke="#4a90d9" stroke-width="2"/>
+                <polyline points="0,60 50,40 100,55 150,30 200,45 250,20 300,35 350,25 400,30 400,80 0,80" fill="rgba(74,144,217,0.15)" stroke="none"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- 数字指标 - 占 4列 1行 -->
+          <div style="grid-column:9/13;grid-row:1/2;background:#fff;border-radius:6px;border:1px solid #e0e0e0;padding:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size:10px;color:#888;">当前温度</div>
+            <div style="font-size:24px;font-weight:700;color:#4a90d9;">25.3°C</div>
+          </div>
+
+          <!-- 状态灯 - 占 4列 1行 -->
+          <div style="grid-column:9/13;grid-row:2/3;background:#fff;border-radius:6px;border:1px solid #e0e0e0;padding:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size:10px;color:#888;">设备状态</div>
+            <div style="display:inline-block;width:14px;height:14px;background:#52c41a;border-radius:50%;margin-top:4px;vertical-align:middle;"></div>
+            <span style="font-size:12px;color:#52c41a;vertical-align:middle;margin-left:4px;">在线</span>
+          </div>
+
+          <!-- 仪表盘组件 - 占 4列 1行 -->
+          <div style="grid-column:9/13;grid-row:3/4;background:#fff;border-radius:6px;border:1px solid #e0e0e0;padding:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size:10px;color:#888;">湿度</div>
+            <div style="font-size:18px;font-weight:700;color:#faad14;">65%</div>
+            <div style="background:#f0f0f0;border-radius:4px;height:4px;margin-top:4px;"><div style="background:#faad14;border-radius:4px;height:100%;width:65%;"></div></div>
+          </div>
+
+          <!-- 告警列表 - 占 6列 3行 -->
+          <div style="grid-column:1/7;grid-row:4/7;background:#fff;border-radius:6px;border:1px solid #e0e0e0;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size:11px;font-weight:600;color:#333;margin-bottom:6px;">告警列表</div>
+            <div style="font-size:10px;background:#fff2f0;border-left:3px solid #ff4d4f;padding:4px 6px;margin:3px 0;border-radius:2px;">
+              <span style="color:#ff4d4f;font-weight:600;">CRITICAL</span> 高温告警 — sensor-001 — 92.5°C
+            </div>
+            <div style="font-size:10px;background:#fff7e6;border-left:3px solid #faad14;padding:4px 6px;margin:3px 0;border-radius:2px;">
+              <span style="color:#faad14;font-weight:600;">WARNING</span> 湿度异常 — sensor-002 — 89%
+            </div>
+            <div style="font-size:10px;background:#f6ffed;border-left:3px solid #52c41a;padding:4px 6px;margin:3px 0;border-radius:2px;">
+              <span style="color:#52c41a;font-weight:600;">RESOLVED</span> 温度恢复正常 — sensor-003
+            </div>
+          </div>
+
+          <!-- 数据表格 - 占 6列 3行 -->
+          <div style="grid-column:7/13;grid-row:4/7;background:#fff;border-radius:6px;border:1px solid #e0e0e0;padding:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+            <div style="font-size:11px;font-weight:600;color:#333;margin-bottom:6px;">设备数据</div>
+            <table style="width:100%;font-size:10px;border-collapse:collapse;">
+              <tr style="background:#fafafa;border-bottom:1px solid #eee;">
+                <th style="padding:3px 4px;text-align:left;">设备</th>
+                <th style="padding:3px 4px;text-align:right;">温度</th>
+                <th style="padding:3px 4px;text-align:right;">湿度</th>
+                <th style="padding:3px 4px;text-align:center;">状态</th>
+              </tr>
+              <tr style="border-bottom:1px solid #f5f5f5;">
+                <td style="padding:3px 4px;">sensor-001</td>
+                <td style="padding:3px 4px;text-align:right;">25.3°C</td>
+                <td style="padding:3px 4px;text-align:right;">65%</td>
+                <td style="padding:3px 4px;text-align:center;color:#52c41a;">●</td>
+              </tr>
+              <tr style="border-bottom:1px solid #f5f5f5;">
+                <td style="padding:3px 4px;">sensor-002</td>
+                <td style="padding:3px 4px;text-align:right;">28.1°C</td>
+                <td style="padding:3px 4px;text-align:right;">89%</td>
+                <td style="padding:3px 4px;text-align:center;color:#52c41a;">●</td>
+              </tr>
+              <tr>
+                <td style="padding:3px 4px;">sensor-003</td>
+                <td style="padding:3px 4px;text-align:right;">22.0°C</td>
+                <td style="padding:3px 4px;text-align:right;">55%</td>
+                <td style="padding:3px 4px;text-align:center;color:#ccc;">●</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧配置面板 -->
+      <div style="width:200px;background:#fafafa;border-left:1px solid #ddd;padding:8px;font-size:11px;overflow-y:auto;">
+        <div style="font-weight:600;color:#555;margin-bottom:8px;">组件配置</div>
+        <div style="color:#888;">点击画布中的组件进行配置</div>
+
+        <div style="margin-top:12px;border-top:1px solid #eee;padding-top:8px;">
+          <div style="font-weight:500;color:#333;margin-bottom:4px;">基础设置</div>
+          <div style="margin:4px 0;">
+            <label style="color:#888;font-size:10px;">标题</label>
+            <input class="mock-input" style="width:100%;font-size:10px;padding:3px 6px;" value="温度实时曲线">
+          </div>
+          <div style="margin:4px 0;">
+            <label style="color:#888;font-size:10px;">数据源</label>
+            <select class="mock-input" style="width:100%;font-size:10px;padding:3px 6px;">
+              <option>$device</option>
+            </select>
+          </div>
+          <div style="margin:4px 0;">
+            <label style="color:#888;font-size:10px;">指标</label>
+            <select class="mock-input" style="width:100%;font-size:10px;padding:3px 6px;">
+              <option>temperature</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px;">
+          <div style="font-weight:500;color:#333;margin-bottom:4px;">图表设置</div>
+          <div style="margin:4px 0;">
+            <label style="color:#888;font-size:10px;">时间粒度</label>
+            <select class="mock-input" style="width:100%;font-size:10px;padding:3px 6px;">
+              <option>实时(秒级)</option>
+              <option>分钟</option>
+              <option>小时</option>
+              <option>天</option>
+            </select>
+          </div>
+          <div style="margin:4px 0;">
+            <label style="color:#888;font-size:10px;">聚合方式</label>
+            <select class="mock-input" style="width:100%;font-size:10px;padding:3px 6px;">
+              <option>mean</option>
+              <option>max</option>
+              <option>min</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p style="text-align:center;margin-top:12px;color:#888;font-size:13px;">
+  编辑模式：三栏布局 — 左侧组件库拖入中央画布，右侧配置选中组件属性，顶部管理全局变量
+</p>
