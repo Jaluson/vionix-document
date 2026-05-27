@@ -4,7 +4,7 @@
 
 ## 适用范围
 
-当前仓库已具备 Mosquitto、Telegraf、InfluxDB 的最小基础设施；Backend、Frontend、MySQL、Redis、RBAC、规则引擎、WebSocket 和低代码仪表盘仍属于目标完整平台的待开发内容。
+当前仓库已具备 Mosquitto、Telegraf、InfluxDB 的最小基础设施，并已开始交付 Spring Boot 4 后端骨架与数据库迁移入口；Frontend、RBAC、完整设备目录、指标服务、规则引擎、WebSocket 和低代码仪表盘仍属于目标完整平台的待开发内容。当前 Compose 仍只承诺基础设施可运行。
 
 本文档集描述目标完整平台的开发要求，同时明确当前阶段可运行边界，避免把未交付应用能力误认为当前仓库已经具备。
 

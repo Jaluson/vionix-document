@@ -1,0 +1,53 @@
+server:
+  port: "${SERVER_PORT:8080}"
+
+spring:
+  application:
+    name: vionix-backend
+  datasource:
+    url: "${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/vionix?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8}"
+    username: "${SPRING_DATASOURCE_USERNAME:vionix}"
+    password: "${SPRING_DATASOURCE_PASSWORD:}"
+    hikari:
+      initialization-fail-timeout: -1
+  flyway:
+    enabled: "${VIONIX_FLYWAY_ENABLED:false}"
+    locations: "${VIONIX_FLYWAY_LOCATIONS:filesystem:../database/migrations,filesystem:database/migrations}"
+    baseline-on-migrate: true
+  sql:
+    init:
+      mode: never
+  data:
+    redis:
+      host: "${SPRING_DATA_REDIS_HOST:localhost}"
+      port: "${SPRING_DATA_REDIS_PORT:6379}"
+      password: "${SPRING_DATA_REDIS_PASSWORD:}"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    db:
+      enabled: true
+    redis:
+      enabled: true
+
+vionix:
+  influxdb:
+    url: "${INFLUXDB_URL:http://localhost:8086}"
+    org: "${INFLUXDB_ORG:vionix}"
+    bucket: "${INFLUXDB_BUCKET:device_raw}"
+    token: "${INFLUXDB_TOKEN:}"
+    health-timeout: 2s
+  mqtt:
+    broker: "${MQTT_BROKER:tcp://localhost:1883}"
+    connection-timeout: 2s
+  security:
+    jwt-secret: "${AUTH_JWT_SECRET:}"
+    token-hash-salt: "${AUTH_TOKEN_HASH_SALT:}"

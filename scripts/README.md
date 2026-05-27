@@ -10,3 +10,10 @@
 - CI 复用脚本
 
 脚本应可重复执行，并在文件头说明用途、依赖和运行方式。
+
+## 已有脚本
+
+| 脚本 | 用途 |
+|------|------|
+| `verify-m0-infrastructure.ps1` | 检查 M0 基础设施配置是否满足开发文档中的 topic/tag、降采样和密钥配置要求。 |
+| `verify-m1-backend.ps1` | 检查 M1 后端骨架、迁移脚本和可选 Compose profile。 |

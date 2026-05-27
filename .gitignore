@@ -1,1 +1,4 @@
 .claude/
+deploy/local/.env
+target/
+backend/target/

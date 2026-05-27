@@ -16,28 +16,97 @@ services:
     ports:
       - "8086:8086"
     environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=admin
-      - DOCKER_INFLUXDB_INIT_PASSWORD=admin123456
-      - DOCKER_INFLUXDB_INIT_ORG=vionix
-      - DOCKER_INFLUXDB_INIT_BUCKET=device_raw
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-super-secret-token
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${VIONIX_INFLUXDB_INIT_USERNAME:?set VIONIX_INFLUXDB_INIT_USERNAME}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${VIONIX_INFLUXDB_INIT_PASSWORD:?set VIONIX_INFLUXDB_INIT_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${VIONIX_INFLUXDB_ORG:-vionix}
+      DOCKER_INFLUXDB_INIT_BUCKET: device_raw
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${VIONIX_INFLUXDB_ADMIN_TOKEN:?set VIONIX_INFLUXDB_ADMIN_TOKEN}
     volumes:
       - influxdb_data:/var/lib/influxdb2
       - ./influxdb/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     restart: unless-stopped
 
   telegraf:
-    image: telegraf:latest
+    image: telegraf:1.38
     container_name: telegraf
     depends_on:
       - mosquitto
       - influxdb
+    environment:
+      INFLUX_TOKEN: ${VIONIX_INFLUXDB_ADMIN_TOKEN:?set VIONIX_INFLUXDB_ADMIN_TOKEN}
+      INFLUX_ORG: ${VIONIX_INFLUXDB_ORG:-vionix}
+      INFLUX_BUCKET: device_raw
+      VIONIX_DEV_TENANT_ID: ${VIONIX_DEV_TENANT_ID:-dev}
     volumes:
       - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.0
+    container_name: vionix-mysql
+    profiles:
+      - m1
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: vionix
+      MYSQL_USER: ${MYSQL_USER:-vionix}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: vionix-redis
+    profiles:
+      - m1
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ../../backend
+    container_name: vionix-backend
+    profiles:
+      - m1
+    depends_on:
+      - mosquitto
+      - influxdb
+      - mysql
+      - redis
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/vionix?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-vionix}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD}
+      VIONIX_FLYWAY_ENABLED: "true"
+      VIONIX_FLYWAY_LOCATIONS: filesystem:/database/migrations
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      INFLUXDB_URL: http://influxdb:8086
+      INFLUXDB_ORG: ${VIONIX_INFLUXDB_ORG:-vionix}
+      INFLUXDB_BUCKET: device_raw
+      INFLUXDB_TOKEN: ${VIONIX_INFLUXDB_ADMIN_TOKEN:?set VIONIX_INFLUXDB_ADMIN_TOKEN}
+      MQTT_BROKER: tcp://mosquitto:1883
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?set AUTH_JWT_SECRET}
+      AUTH_TOKEN_HASH_SALT: ${AUTH_TOKEN_HASH_SALT:?set AUTH_TOKEN_HASH_SALT}
+    volumes:
+      - ../../database/migrations:/database/migrations:ro
     restart: unless-stopped
 
 volumes:
   mosquitto_data:
   mosquitto_log:
   influxdb_data:
+  mysql_data:
+  redis_data:
