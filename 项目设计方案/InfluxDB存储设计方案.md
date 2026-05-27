@@ -4,99 +4,147 @@
 
 | Bucket 名称 | 粒度 | 保留时长 | 用途 |
 |-------------|------|---------|------|
-| `device_raw` | 秒级（原始值） | 35 分钟 | 实时大屏，为降采样留出容错窗口（保留时间大于查询路由阈值 30 分钟，避免边界数据丢失） |
-| `device_min` | 分钟级 | 2 小时 | 短时趋势/故障排查 |
-| `device_hour` | 小时级 | 90 天 | 日报/周报/月报 |
-| `device_day` | 天级 | 永久 | 年报/同比分析 |
+| `device_raw` | 秒级原始值 | 2 分钟 | 实时大屏、规则引擎最近窗口 |
+| `device_min` | 分钟级聚合 | 2 小时 | 短时趋势、故障排查 |
+| `device_hour` | 小时级聚合 | 90 天 | 日报、周报、月报 |
+| `device_day` | 天级聚合 | 永久 | 年报、同比分析 |
 
-## 2. 聚合策略
+## 2. Measurement、Tag 和 Field
 
-**每个降采样级别同时存储 5 种聚合值**，字段自动加后缀：
+统一 measurement：
+
+```
+device_metrics
+```
+
+必选 tag：
+
+| Tag | 说明 |
+|-----|------|
+| `tenant_id` | 租户边界，来自 topic、设备注册表或后端写入网关 |
+| `device_id` | 设备唯一标识，历史查询、前端筛选和规则匹配都依赖该字段 |
+| `source` | 数据来源，如 `mqtt`、`modbus`、`http` |
+
+可选 tag：
+
+| Tag | 说明 |
+|-----|------|
+| `group_id` | 设备分组冗余标签，只用于查询加速 |
+| `location` | 位置维度，适合低基数场景 |
+
+field 为设备指标，如 `temperature`、`humidity`、`voltage`。需要进入降采样链路的 field 必须是数值类型；字符串状态适合另建状态流或只保留在原始层。
+
+## 3. 聚合字段规范
+
+`device_raw` 存原始字段，字段名不带聚合后缀。
+
+`device_min`、`device_hour`、`device_day` 均使用同一套输出字段名，不叠加二次后缀：
 
 ```
 原始字段: temperature
 
-device_min / device_hour / device_day 中生成:
-  temperature_mean   均值
-  temperature_sum    总和
-  temperature_max    最大值
-  temperature_min    最小值
-  temperature_count  数据点数
+聚合字段:
+  temperature_mean
+  temperature_sum
+  temperature_max
+  temperature_min
+  temperature_count
 ```
 
-`device_raw` 存原始值，字段名不带后缀。
+后端查询历史聚合数据时按 `metric + "_" + agg` 生成字段名。例如 `metric=temperature&agg=mean` 查询 `temperature_mean`。任何层级都不应出现 `temperature_mean_mean`、`temperature_sum_sum` 这类字段。
 
-降采样聚合是不可逆的（无法从均值反推总和），所以一开始就全存。
+## 4. 降采样口径
 
-## 3. 降采样 Task
+### 4.1 秒级到分钟级
 
-由 InfluxDB 内置 Task Scheduler 自动执行，无需外部定时器。
+输入：`device_raw.temperature`
+
+输出：
+
+| 输出字段 | 计算方式 |
+|----------|----------|
+| `temperature_mean` | `mean(temperature)` |
+| `temperature_sum` | `sum(temperature)` |
+| `temperature_max` | `max(temperature)` |
+| `temperature_min` | `min(temperature)` |
+| `temperature_count` | `count(temperature)` |
+
+### 4.2 分钟级到小时级
+
+输入：`device_min.temperature_*`
+
+输出：
+
+| 输出字段 | 计算方式 |
+|----------|----------|
+| `temperature_mean` | `sum(temperature_sum) / sum(temperature_count)` |
+| `temperature_sum` | `sum(temperature_sum)` |
+| `temperature_max` | `max(temperature_max)` |
+| `temperature_min` | `min(temperature_min)` |
+| `temperature_count` | `sum(temperature_count)` |
+
+### 4.3 小时级到天级
+
+输入：`device_hour.temperature_*`
+
+输出方式与分钟到小时一致：
+
+| 输出字段 | 计算方式 |
+|----------|----------|
+| `temperature_mean` | `sum(temperature_sum) / sum(temperature_count)` |
+| `temperature_sum` | `sum(temperature_sum)` |
+| `temperature_max` | `max(temperature_max)` |
+| `temperature_min` | `min(temperature_min)` |
+| `temperature_count` | `sum(temperature_count)` |
+
+均值必须按 count 加权，不能对上一层的 `*_mean` 直接取普通平均值；否则缺点或采集频率不均时会产生统计偏差。
+
+## 5. Task 实现要求
+
+InfluxDB Task 需要按字段后缀过滤后分别计算，不能对上一层所有字段一概 `aggregateWindow + rename`。
+
+推荐处理流程：
 
 ```
-device_raw (每秒原值)
-    ↓ Task 每 1m 执行，aggregateWindow(every: 1m)
-device_min (每整分钟一条，5 种聚合)
-    ↓ Task 每 1h 执行，aggregateWindow(every: 1h)
-device_hour (每整小时一条，5 种聚合)
-    ↓ Task 每 1d 执行，aggregateWindow(every: 1d)
-device_day (每天一条，5 种聚合)
+device_raw
+  -> 对原始数值字段分别生成 *_mean/*_sum/*_max/*_min/*_count
+  -> 写入 device_min
+
+device_min
+  -> 只读取 *_sum 和 *_count 计算加权 mean
+  -> 只读取 *_sum 计算 sum
+  -> 只读取 *_max 计算 max
+  -> 只读取 *_min 计算 min
+  -> 只读取 *_count 计算 count
+  -> 写入 device_hour，字段名仍为 *_mean/*_sum/*_max/*_min/*_count
+
+device_hour
+  -> 按同样规则写入 device_day
 ```
 
-## 4. 查询路由
+当前 `influxdb/init.sh` 如直接对 `device_min` 和 `device_hour` 的所有字段再次追加后缀，会生成错误字段名。实现时必须按本节字段映射修正 Task。
 
-后端根据查询时间范围自动选择 Bucket：
+## 6. 查询路由
 
-```
-时间跨度 ≤ 30分钟  → device_raw（后端对原始值做内存聚合）
-时间跨度 ≤ 2小时   → device_min
-时间跨度 ≤ 90天   → device_hour
-时间跨度 > 90天   → device_day
-```
-
-## 5. 写入流程
+后端根据查询时间范围自动选择 bucket：
 
 ```
-任何数据源 → Telegraf → device_raw（批量写入，建议 500ms 或 500 条一批）
+时间跨度 <= 2分钟  -> device_raw
+时间跨度 <= 2小时  -> device_min
+时间跨度 <= 90天   -> device_hour
+时间跨度 > 90天    -> device_day
 ```
 
-降采样由 InfluxDB Task 自动完成，写入端只需写秒级原始数据。
+查询参数中的 `tenant_id` 来自认证上下文，不由普通用户请求体指定。`device_id`、`source`、`group_id` 等筛选条件必须编译为 tag 过滤。
 
-## 6. Measurement 数据模型
+## 7. 写入流程
 
-所有 bucket 使用统一 measurement `device_metrics`，结构如下：
+```
+MQTT / Modbus / HTTP
+  -> Telegraf 或后端写入网关
+  -> 补齐 tenant_id、device_id、source tag
+  -> 写入 device_raw
+  -> InfluxDB Task 自动降采样
+```
 
-**Tags（索引字段，用于过滤和 GROUP BY）：**
-
-| Tag | 说明 | 示例 |
-|-----|------|------|
-| `tenant_id` | 租户 ID，行级隔离 | `1` |
-| `device_id` | 设备标识 | `sensor-001` |
-| `device_type` | 设备类型（可选） | `thermometer` |
-
-**Fields（数据值，不建索引）：**
-
-| Field | 类型 | 说明 |
-|-------|------|------|
-| `temperature` | float | 温度（原始值） |
-| `humidity` | float | 湿度（原始值） |
-| ... | ... | 其他业务指标 |
-
-> 降采样后字段名加后缀：`temperature_mean`、`temperature_max` 等。
-
-## 7. 多租户隔离策略
-
-采用 **共享 Bucket + `tenant_id` Tag 过滤** 策略：
-
-- 所有租户数据写入同一组 Bucket，通过 `tenant_id` tag 区分
-- 查询时后端自动拼接 `|> filter(fn: (r) => r.tenant_id == "{tenantId}")`
-- 降采样 Task 会保留 `tenant_id` tag，聚合后的数据仍可按租户过滤
-
-**选择理由：**
-
-| 策略 | 选择 | 原因 |
-|------|------|------|
-| 按 Bucket 隔离 | 未选择 | 每租户 4 个 Bucket，管理复杂 |
-| 按 Organization 隔离 | 未选择 | Org 数量有限制，不适合大量租户 |
-| **按 Tag 隔离** | **选择** | 运维简单，查询性能通过 tag 索引保证 |
-
-> 若未来单租户数据量极大（亿级数据点/天），可针对该租户迁移为独立 Bucket。
+写入端只写秒级原始数据。降采样由 InfluxDB Task 完成，规则引擎需要实时评估时优先消费 MQTT 消息；需要巡检聚合指标时再查询相应 bucket。
