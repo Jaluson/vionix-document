@@ -3,7 +3,7 @@
 ## 1. 秒级实时数据
 
 ```
-设备 -> Mosquitto -> Spring Boot MQTT Consumer -> WebSocket/STOMP -> Vue 图表
+设备 -> Mosquitto -> Spring Boot 4 MQTT Consumer -> WebSocket/STOMP -> Vue 图表
 ```
 
 后端收到 MQTT 消息后先解析并校验 `tenant_id`、`device_id`、`source` 和指标字段，再按 WebSocket 订阅关系推送给有权限的前端连接。前端可以继续按设备和指标做展示过滤，但安全边界必须在服务端完成。
@@ -11,7 +11,7 @@
 ## 2. 分钟/小时/天级历史查询
 
 ```
-Vue -> HTTP GET /api/metrics -> Spring Boot -> InfluxDB
+Vue -> HTTP GET /api/metrics -> Spring Boot 4 -> InfluxDB
 ```
 
 API：
