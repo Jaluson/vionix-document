@@ -1,35 +1,61 @@
 #!/bin/bash
 set -euo pipefail
 
-INFLUX_URL="http://localhost:8086"
+INFLUX_URL="${INFLUX_URL:-http://localhost:8086}"
 TOKEN="${DOCKER_INFLUXDB_INIT_ADMIN_TOKEN:?DOCKER_INFLUXDB_INIT_ADMIN_TOKEN is required}"
 ORG="${DOCKER_INFLUXDB_INIT_ORG:-vionix}"
+export INFLUX_HOST="${INFLUX_URL}"
 
 until curl -sf "${INFLUX_URL}/health" > /dev/null; do
   echo "Waiting for InfluxDB..."
   sleep 2
 done
 
+until influx org list --token "${TOKEN}" > /dev/null 2>&1; do
+  echo "Waiting for InfluxDB setup..."
+  sleep 2
+done
+
 echo "InfluxDB is ready. Creating buckets and tasks..."
 
-influx bucket update \
-  --name device_raw \
-  --retention 2m \
-  --token "${TOKEN}" \
-  --org "${ORG}" || true
+RAW_BUCKET_ID="$(influx bucket list --token "${TOKEN}" --org "${ORG}" --hide-headers | awk '$2 == "device_raw" {print $1; exit}')"
+if [[ -n "${RAW_BUCKET_ID}" ]]; then
+  # InfluxDB OSS 2.7 rejects bucket retention below one hour.
+  influx bucket update \
+    --id "${RAW_BUCKET_ID}" \
+    --retention 1h \
+    --shard-group-duration 0 \
+    --token "${TOKEN}"
+fi
 
-influx bucket create -n device_min  -r 2h  -o "${ORG}" --token "${TOKEN}" || true
-influx bucket create -n device_hour -r 90d -o "${ORG}" --token "${TOKEN}" || true
-influx bucket create -n device_day  -r 0   -o "${ORG}" --token "${TOKEN}" || true
+bucket_exists() {
+  influx bucket list --token "${TOKEN}" --org "${ORG}" --name "$1" --hide-headers \
+    | awk -v name="$1" '$2 == name {found = 1} END {exit(found ? 0 : 1)}'
+}
+
+create_bucket_if_missing() {
+  if ! bucket_exists "$1"; then
+    influx bucket create -n "$1" -r "$2" -o "${ORG}" --token "${TOKEN}"
+  fi
+}
+
+create_bucket_if_missing device_min 2h
+create_bucket_if_missing device_hour 90d
+create_bucket_if_missing device_day 0
 
 echo "Buckets created."
 
+task_exists() {
+  influx task list --token "${TOKEN}" --org "${ORG}" --hide-headers | grep -q "$1"
+}
+
+if ! task_exists "downsample-raw-to-min"; then
 influx task create \
   --token "${TOKEN}" \
   --org "${ORG}" \
-  --name "downsample-raw-to-min" \
-  --every 1m \
   - <<FLUX
+option task = {name: "downsample-raw-to-min", every: 1m}
+
 source = from(bucket: "device_raw")
   |> range(start: -2m)
   |> filter(fn: (r) => r._measurement == "device_metrics")
@@ -57,14 +83,16 @@ agg_count = source
 union(tables: [agg_mean, agg_sum, agg_max, agg_min, agg_count])
   |> to(bucket: "device_min", org: "${ORG}")
 FLUX
+fi
 
+if ! task_exists "downsample-min-to-hour"; then
 influx task create \
   --token "${TOKEN}" \
   --org "${ORG}" \
-  --name "downsample-min-to-hour" \
-  --every 1h \
   - <<FLUX
 import "strings"
+
+option task = {name: "downsample-min-to-hour", every: 1h}
 
 source = from(bucket: "device_min")
   |> range(start: -2h)
@@ -133,14 +161,16 @@ agg_count = source
 union(tables: [agg_mean, agg_sum, agg_max, agg_min, agg_count])
   |> to(bucket: "device_hour", org: "${ORG}")
 FLUX
+fi
 
+if ! task_exists "downsample-hour-to-day"; then
 influx task create \
   --token "${TOKEN}" \
   --org "${ORG}" \
-  --name "downsample-hour-to-day" \
-  --every 1d \
   - <<FLUX
 import "strings"
+
+option task = {name: "downsample-hour-to-day", every: 1d}
 
 source = from(bucket: "device_hour")
   |> range(start: -90d)
@@ -209,5 +239,6 @@ agg_count = source
 union(tables: [agg_mean, agg_sum, agg_max, agg_min, agg_count])
   |> to(bucket: "device_day", org: "${ORG}")
 FLUX
+fi
 
 echo "All tasks created. Initialization complete."

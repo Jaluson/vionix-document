@@ -6,8 +6,8 @@ services:
       - "1883:1883"
     volumes:
       - ./mosquitto/config:/mosquitto/config
-      - mosquitto_data:/mosquitto/data
-      - mosquitto_log:/mosquitto/log
+      - ../../docker-data/mosquitto/data:/mosquitto/data
+      - ../../docker-data/mosquitto/log:/mosquitto/log
     restart: unless-stopped
 
   influxdb:
@@ -23,16 +23,37 @@ services:
       DOCKER_INFLUXDB_INIT_BUCKET: device_raw
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${VIONIX_INFLUXDB_ADMIN_TOKEN:?set VIONIX_INFLUXDB_ADMIN_TOKEN}
     volumes:
-      - influxdb_data:/var/lib/influxdb2
-      - ./influxdb/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ../../docker-data/influxdb:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8086/health > /dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
     restart: unless-stopped
+
+  influxdb-init:
+    image: influxdb:2.7
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${VIONIX_INFLUXDB_ADMIN_TOKEN:?set VIONIX_INFLUXDB_ADMIN_TOKEN}
+      DOCKER_INFLUXDB_INIT_ORG: ${VIONIX_INFLUXDB_ORG:-vionix}
+    volumes:
+      - ./influxdb/init.sh:/init.sh:ro
+    entrypoint: ["/bin/bash", "/init.sh"]
+    restart: "no"
 
   telegraf:
     image: telegraf:1.38
     container_name: telegraf
     depends_on:
-      - mosquitto
-      - influxdb
+      mosquitto:
+        condition: service_started
+      influxdb-init:
+        condition: service_completed_successfully
     environment:
       INFLUX_TOKEN: ${VIONIX_INFLUXDB_ADMIN_TOKEN:?set VIONIX_INFLUXDB_ADMIN_TOKEN}
       INFLUX_ORG: ${VIONIX_INFLUXDB_ORG:-vionix}
@@ -57,7 +78,13 @@ services:
       TZ: Asia/Shanghai
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ../../docker-data/mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
     restart: unless-stopped
 
   redis:
@@ -69,7 +96,12 @@ services:
       - "6379:6379"
     command: redis-server --appendonly yes
     volumes:
-      - redis_data:/data
+      - ../../docker-data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     restart: unless-stopped
 
   backend:
@@ -79,10 +111,14 @@ services:
     profiles:
       - m1
     depends_on:
-      - mosquitto
-      - influxdb
-      - mysql
-      - redis
+      mosquitto:
+        condition: service_started
+      influxdb-init:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
@@ -98,15 +134,22 @@ services:
       INFLUXDB_BUCKET: device_raw
       INFLUXDB_TOKEN: ${VIONIX_INFLUXDB_ADMIN_TOKEN:?set VIONIX_INFLUXDB_ADMIN_TOKEN}
       MQTT_BROKER: tcp://mosquitto:1883
+      MQTT_CONSUMER_ENABLED: "true"
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?set AUTH_JWT_SECRET}
       AUTH_TOKEN_HASH_SALT: ${AUTH_TOKEN_HASH_SALT:?set AUTH_TOKEN_HASH_SALT}
+      VIONIX_BOOTSTRAP_ADMIN_PASSWORD: ${VIONIX_BOOTSTRAP_ADMIN_PASSWORD:?set VIONIX_BOOTSTRAP_ADMIN_PASSWORD}
     volumes:
       - ../../database/migrations:/database/migrations:ro
     restart: unless-stopped
 
-volumes:
-  mosquitto_data:
-  mosquitto_log:
-  influxdb_data:
-  mysql_data:
-  redis_data:
+  frontend:
+    build:
+      context: ../../frontend
+    container_name: vionix-frontend
+    profiles:
+      - m1
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+    restart: unless-stopped

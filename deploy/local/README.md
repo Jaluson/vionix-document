@@ -20,6 +20,7 @@
 | `MYSQL_PASSWORD` | M1 profile 使用的应用数据库密码 |
 | `AUTH_JWT_SECRET` | M1 profile 使用的 JWT 签名密钥 |
 | `AUTH_TOKEN_HASH_SALT` | M1 profile 使用的 refreshToken hash 盐 |
+| `VIONIX_BOOTSTRAP_ADMIN_PASSWORD` | M1 profile 首次启动时创建默认管理员使用的密码 |
 
 ## 启动
 
@@ -35,11 +36,11 @@ docker compose --env-file deploy/local/.env -f deploy/local/docker-compose.yml l
 - InfluxDB UI：`http://localhost:8086`
 - Telegraf MQTT JSON 采集
 
-当前 Compose 不包含 Backend、Frontend、MySQL、Redis 和 WebSocket 服务。`backend/` 已有 M1 骨架，但尚未纳入本地基础设施编排。
+默认 Compose 不启动 Backend、Frontend、MySQL、Redis 和 WebSocket 服务。显式启用 `m1` profile 后，这些应用组件会随本地基础设施一起编排。
 
-## M1 后端骨架 Profile
+## M1 完整应用 Profile
 
-显式启用 `m1` profile 时，Compose 会额外启动 MySQL、Redis，并构建 Backend 骨架：
+显式启用 `m1` profile 时，Compose 会额外启动 MySQL、Redis，并构建 Backend 和 Frontend：
 
 ```powershell
 docker compose --env-file deploy/local/.env -f deploy/local/docker-compose.yml --profile m1 up -d --build
@@ -52,8 +53,9 @@ Backend 暴露：
 |------|------|
 | Backend Actuator | `http://localhost:8080/actuator/health` |
 | Backend Ping | `http://localhost:8080/api/system/ping` |
+| Frontend | `http://localhost:3000` |
 
-该 profile 只用于 M1 骨架验证，不代表 RBAC、指标查询、WebSocket、规则引擎或前端能力已经完成。
+首次启动时，如果数据库为空且 `VIONIX_BOOTSTRAP_ADMIN_PASSWORD` 已配置，后端会创建默认租户 `default` 和管理员 `admin`。
 
 ## MQTT topic
 

@@ -48,6 +48,12 @@ vionix:
   mqtt:
     broker: "${MQTT_BROKER:tcp://localhost:1883}"
     connection-timeout: 2s
+    consumer-enabled: "${MQTT_CONSUMER_ENABLED:false}"
+    client-id: "${MQTT_CLIENT_ID:vionix-backend}"
+    dev-tenant-id: "${VIONIX_DEV_TENANT_ID:dev}"
   security:
     jwt-secret: "${AUTH_JWT_SECRET:}"
     token-hash-salt: "${AUTH_TOKEN_HASH_SALT:}"
+    access-token-ttl: "${AUTH_ACCESS_TOKEN_TTL:30m}"
+    refresh-token-ttl: "${AUTH_REFRESH_TOKEN_TTL:7d}"
+    bootstrap-admin-password: "${VIONIX_BOOTSTRAP_ADMIN_PASSWORD:}"
